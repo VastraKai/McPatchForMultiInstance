@@ -128,35 +128,30 @@ public static class Util
     {
         try
         {
-            // Open the registry key
-            using Microsoft.Win32.RegistryKey? key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock");
-            // Check if the key is null
-            if (key == null)
+            // Check if dev mode is enabled using the error code returned from cmd /c "reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock /v AllowDevelopmentWithoutDevLicense | findstr /I /C:"0x1""
+            // Create a process to run the command
+            Process p = new Process();
+            p.StartInfo.FileName = Environment.ExpandEnvironmentVariables("%SystemRoot%\\System32\\cmd.exe");
+            p.StartInfo.Arguments = "/c \"reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock /v AllowDevelopmentWithoutDevLicense | findstr /I /C:\"0x1\"\"";
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.UseShellExecute = false;
+            p.StartInfo.CreateNoWindow = true;
+            p.Start();
+            p.WaitForExit();
+            // Get the output
+            string output = p.StandardOutput.ReadToEnd();
+            // Check if the output contains "0x1"
+            if (output.Contains("0x1"))
             {
-                // Return false
-                return false;
-            }
-            // Get the value of the key
-            object? value = key.GetValue("AllowDevelopmentWithoutDevLicense");
-            // Check if the value is null
-            if (value == null)
-            {
-                // Return false
-                return false;
-            }
-            // Check if the value is 1
-            if (value.ToString() == "1")
-            {
-                // Return true
                 return true;
             }
-            // Return false
             return false;
         }
         catch (Exception ex)
         {
             Console.WriteLine("Error while checking if developer mode is enabled: " + ex);
-            return false;
+            Console.ReadKey(true);
+            return true;
         }
     }
 

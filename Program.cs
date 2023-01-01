@@ -6,7 +6,8 @@ public class Program
 */
     public static void Main(string[] args)
     {
-        // Check if development mode is enabled
+
+        // Check if development mode is enabled (broken lol)
         if (!Util.IsDeveloperModeEnabled())
         {
             // Show a message box
