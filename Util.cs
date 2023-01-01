@@ -1,12 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Diagnostics;
-using System.Threading.Tasks;
-using Windows.Management.Deployment;
+﻿using System.Diagnostics;
 using Windows.ApplicationModel;
 using Windows.Management.Core;
+using Windows.Management.Deployment;
 
 namespace McPatchForMultiInstance;
 public static class Util
@@ -26,11 +21,11 @@ public static class Util
         string tmpDir = GetBackupMinecraftDataDir();
         if (Directory.Exists(tmpDir))
         {
-            Debug.WriteLine("BackupMinecraftDataForRemoval error: " + tmpDir + " already exists");
+            Console.WriteLine("BackupMinecraftDataForRemoval error: " + tmpDir + " already exists");
             Process.Start("explorer.exe", tmpDir);
             throw new Exception("Temporary dir exists");
         }
-        Debug.WriteLine("Moving Minecraft data to: " + tmpDir);
+        Console.WriteLine("Moving Minecraft data to: " + tmpDir);
         Directory.Move(data.LocalFolder.Path, tmpDir);
     }
 
@@ -41,7 +36,7 @@ public static class Util
             string ft = Path.Combine(to, Path.GetFileName(f));
             if (File.Exists(ft))
                 File.Delete(ft);
-            
+
             File.Move(f, ft);
         }
         foreach (var f in Directory.EnumerateDirectories(from))
@@ -63,14 +58,14 @@ public static class Util
         if (!Directory.Exists(tmpDir))
             return;
         var data = ApplicationDataManager.CreateForPackageFamily(packageFamily);
-        Debug.WriteLine("Moving backup Minecraft data to: " + data.LocalFolder.Path);
+        Console.WriteLine("Moving backup Minecraft data to: " + data.LocalFolder.Path);
         RestoreMove(tmpDir, data.LocalFolder.Path);
         Directory.Delete(tmpDir, true);
     }
 
     public static async Task RemovePackage(Package pkg, string packageFamily)
     {
-        Debug.WriteLine("Removing package: " + pkg.Id.FullName);
+        Console.WriteLine("Removing package: " + pkg.Id.FullName);
         if (!pkg.IsDevelopmentMode)
         {
             BackupMinecraftDataForRemoval(packageFamily);
@@ -78,10 +73,10 @@ public static class Util
         }
         else
         {
-            Debug.WriteLine("Package is in development mode");
+            Console.WriteLine("Package is in development mode");
             new PackageManager().RemovePackageAsync(pkg.Id.FullName, RemovalOptions.PreserveApplicationData).AsTask().Wait();
         }
-        Debug.WriteLine("Removal of package done: " + pkg.Id.FullName);
+        Console.WriteLine("Removal of package done: " + pkg.Id.FullName);
     }
 
     public static string GetPackagePath(Package pkg)
@@ -115,19 +110,19 @@ public static class Util
             string location = GetPackagePath(pkg);
             if (location == gameDir)
             {
-                Debug.WriteLine("Skipping package removal - same path: " + pkg.Id.FullName + " " + location);
+                Console.WriteLine("Skipping package removal - same path: " + pkg.Id.FullName + " " + location);
                 return;
             }
             await RemovePackage(pkg, packageFamily);
         }
-        Debug.WriteLine("Registering package");
+        Console.WriteLine("Registering package");
         string manifestPath = Path.Combine(gameDir, "AppxManifest.xml");
         new PackageManager().RegisterPackageAsync(new Uri(manifestPath), null, DeploymentOptions.DevelopmentMode).AsTask().Wait();
-        Debug.WriteLine("App re-regiRegisterPackageAsyncster done!");
+        Console.WriteLine("App re-regiRegisterPackageAsyncster done!");
         RestoreMinecraftDataFromReinstall(packageFamily);
     }
     // ----------
-    
+
     // Check if developer mode is enabled with the key name "AllowDevelopmentWithoutDevLicense"
     public static bool IsDeveloperModeEnabled()
     {
@@ -157,13 +152,14 @@ public static class Util
             }
             // Return false
             return false;
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
             Console.WriteLine("Error while checking if developer mode is enabled: " + ex);
             return false;
         }
     }
-    
+
     // Field to get the minecraft.windows process
     public static Process? McProc
     {
@@ -185,6 +181,6 @@ public static class Util
             return null;
         }
     }
-    
+
 }
 
