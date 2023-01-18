@@ -1,41 +1,65 @@
 ﻿using System.Diagnostics;
+
 namespace McPatchForMultiInstance;
 public class Program
 {
-    /*    
-*/
-    public static void Main(string[] args)
+    public static void PatchMain(string[] args)
     {
-
-        // Check if development mode is enabled (broken lol)
+        bool? enable = null;
+        if (args.Length == 1)
+        {
+            if (args[0] == "-e")
+                enable = true;
+            else if (args[0] == "-d")
+                enable = false;
+            else
+            {
+                // output usage and exit
+                Console.WriteLine($"Usage: {Process.GetCurrentProcess().ProcessName} [-e|-d]");
+                return;
+            }
+        }
+        // Check if development mode is enabled
         if (!Util.IsDeveloperModeEnabled())
         {
-            // Show a message box
-            Console.WriteLine("Please enable developer mode in the settings app.");
-            Console.ReadKey(true);
-            // Exit the program
-            return;
+            Console.WriteLine("Please enable developer mode in the settings app...");
+            Process.Start("explorer.exe", "ms-settings:developers");
+            while (!Util.IsDeveloperModeEnabled())
+            {
+                Thread.Sleep(100);
+            }
         }
-        while (Util.McProc == null)
-        {
-            Console.Write("Please open Minecraft...\r");
-        }
-        Console.Write("\r                        \r");
+        if (Util.McProc == null) Process.Start("explorer.exe", "minecraft:");
+        while (Util.McProc == null) Thread.Sleep(100);
         while (Util.McProc.MainModule == null) { Thread.Sleep(100); }
+
         string McPath = Path.GetFullPath(Util.McProc.MainModule.FileName).Replace("Minecraft.Windows.exe", "");
-        Console.WriteLine("Modifying AppxManifest");
-        string McManContent = File.ReadAllText(McPath + "\\AppxManifest.xml");
-        McManContent =
-        McManContent.Replace("<Application Id=\"App\" Executable=\"Minecraft.Windows.exe\" EntryPoint=\"Minecraft_Win10.App\">",
-                             "<Application Id=\"App\" Executable=\"Minecraft.Windows.exe\" EntryPoint=\"Minecraft_Win10.App\" desktop4:SupportsMultipleInstances=\"true\">");
-        McManContent =
-        McManContent.Replace("<Package xmlns=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10\" xmlns:mp=\"http://schemas.microsoft.com/appx/2014/phone/manifest\" xmlns:uap=\"http://schemas.microsoft.com/appx/manifest/uap/windows10\" xmlns:uap5=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/5\" xmlns:uap4=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/4\" IgnorableNamespaces=\"uap uap4 uap5 mp build\" xmlns:build=\"http://schemas.microsoft.com/developer/appx/2015/build\">",
-                             "<Package xmlns=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10\" xmlns:mp=\"http://schemas.microsoft.com/appx/201/phone/manifest\" xmlns:uap=\"http://schemas.microsoft.com/appx/manifest/uap/windows10\" xmlns:uap5=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/5\" xmlns:uap4=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/4\" IgnorableNamespaces=\"uap uap4 uap5 mp build\" xmlns:build=\"http://schemas.microsoft.com/developer/appx/2015/build\" xmlns:desktop4=\"http://schemas.microsoft.com/appx/manifest/desktop/windows10/4\">");
-        File.WriteAllText(McPath + "\\AppxManifest.xml", McManContent);
-        Console.WriteLine("Re-registering Appx...");
+        Util.GrantAccess(McPath);
+
+        bool? result = null;
+        if (enable == null) result = McUtil.ToggleMultiInstance();
+        else if ((bool)enable) McUtil.EnableMultiInstance();
+        else McUtil.DisableMultiInstance();
+
+        result ??= enable;
         Util.ReRegisterPackage("Microsoft.MinecraftUWP_8wekyb3d8bbwe", McPath).Wait();
-        Console.WriteLine("Finished.");
+
+        if (result != null && (bool)result) Console.WriteLine("Multi-instance is now enabled!");
+        else Console.WriteLine("Multi-instance is now disabled!");
+        if (enable == null) Thread.Sleep(3000);
         // Launch minecraft with the Minecraft: protocol
         Process.Start("explorer.exe", "minecraft:");
+    }
+    public static void Main(string[] args)
+    {
+        try
+        {
+            PatchMain(args);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex}");
+            Console.ReadKey(true);
+        }
     }
 }

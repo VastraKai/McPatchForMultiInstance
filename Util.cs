@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Windows.ApplicationModel;
 using Windows.Management.Core;
 using Windows.Management.Deployment;
@@ -6,8 +8,16 @@ using Windows.Management.Deployment;
 namespace McPatchForMultiInstance;
 public static class Util
 {
-
     // ----- The following methods are from https://github.com/MCMrARM/mc-w10-version-launcher/blob/master/MCLauncher/MainWindow.xaml.cs
+    public static void GrantAccess(string fullPath)
+    {
+        DirectoryInfo dInfo = new(fullPath);
+        DirectorySecurity dSecurity = dInfo.GetAccessControl();
+        // Set the owner of the directory
+        dSecurity.SetOwner(new NTAccount(Environment.UserName));
+        dSecurity.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), FileSystemRights.FullControl, InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit, PropagationFlags.NoPropagateInherit, AccessControlType.Allow));
+        dInfo.SetAccessControl(dSecurity);
+    }
     public static string GetBackupMinecraftDataDir()
     {
         string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -21,11 +31,9 @@ public static class Util
         string tmpDir = GetBackupMinecraftDataDir();
         if (Directory.Exists(tmpDir))
         {
-            Console.WriteLine("BackupMinecraftDataForRemoval error: " + tmpDir + " already exists");
             Process.Start("explorer.exe", tmpDir);
             throw new Exception("Temporary dir exists");
         }
-        Console.WriteLine("Moving Minecraft data to: " + tmpDir);
         Directory.Move(data.LocalFolder.Path, tmpDir);
     }
 
@@ -58,14 +66,12 @@ public static class Util
         if (!Directory.Exists(tmpDir))
             return;
         var data = ApplicationDataManager.CreateForPackageFamily(packageFamily);
-        Console.WriteLine("Moving backup Minecraft data to: " + data.LocalFolder.Path);
         RestoreMove(tmpDir, data.LocalFolder.Path);
         Directory.Delete(tmpDir, true);
     }
 
     public static async Task RemovePackage(Package pkg, string packageFamily)
     {
-        Console.WriteLine("Removing package: " + pkg.Id.FullName);
         if (!pkg.IsDevelopmentMode)
         {
             BackupMinecraftDataForRemoval(packageFamily);
@@ -73,10 +79,8 @@ public static class Util
         }
         else
         {
-            Console.WriteLine("Package is in development mode");
             new PackageManager().RemovePackageAsync(pkg.Id.FullName, RemovalOptions.PreserveApplicationData).AsTask().Wait();
         }
-        Console.WriteLine("Removal of package done: " + pkg.Id.FullName);
     }
 
     public static string GetPackagePath(Package pkg)
@@ -110,15 +114,12 @@ public static class Util
             string location = GetPackagePath(pkg);
             if (location == gameDir)
             {
-                Console.WriteLine("Skipping package removal - same path: " + pkg.Id.FullName + " " + location);
                 return;
             }
             await RemovePackage(pkg, packageFamily);
         }
-        Console.WriteLine("Registering package");
         string manifestPath = Path.Combine(gameDir, "AppxManifest.xml");
         new PackageManager().RegisterPackageAsync(new Uri(manifestPath), null, DeploymentOptions.DevelopmentMode).AsTask().Wait();
-        Console.WriteLine("App re-regiRegisterPackageAsyncster done!");
         RestoreMinecraftDataFromReinstall(packageFamily);
     }
     // ----------
@@ -130,7 +131,7 @@ public static class Util
         {
             // Check if dev mode is enabled using the error code returned from cmd /c "reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock /v AllowDevelopmentWithoutDevLicense | findstr /I /C:"0x1""
             // Create a process to run the command
-            Process p = new Process();
+            Process p = new();
             p.StartInfo.FileName = Environment.ExpandEnvironmentVariables("%SystemRoot%\\System32\\cmd.exe");
             p.StartInfo.Arguments = "/c \"reg query HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock /v AllowDevelopmentWithoutDevLicense | findstr /I /C:\"0x1\"\"";
             p.StartInfo.RedirectStandardOutput = true;
